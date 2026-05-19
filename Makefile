@@ -1,6 +1,6 @@
 .PHONY: build run clean test lint fmt docker-build docker-run gen-rsa
 
-APP_NAME=license-server
+APP_NAME=lic
 VERSION?=dev
 GOFLAGS?=
 

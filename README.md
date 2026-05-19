@@ -1,4 +1,4 @@
-# License Server
+# Lic
 
 基于 Golang + Gin + GORM 实现的软件授权验证服务端，支持在线和离线两种激活方式。
 
@@ -42,6 +42,7 @@ curl -X POST http://localhost:8080/api/v1/register \
 ```
 
 响应示例：
+
 ```json
 {
   "message": "registration successful",
@@ -54,35 +55,35 @@ curl -X POST http://localhost:8080/api/v1/register \
 
 ### 公开接口（无需 Token）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/register` | 注册用户（自动生成授权码） |
-| POST | `/api/v1/login` | 帐密登录，返回 JWT Token |
-| POST | `/api/v1/verify` | 验证授权码状态（无需登录） |
-| POST | `/api/v1/offline/verify` | 客户端验证离线响应文件 |
-| POST | `/api/v1/offline/request/gen` | 生成离线激活请求 |
-| GET  | `/api/v1/offline/request/:token/download` | 下载离线请求文件 |
-| POST | `/api/v1/offline/activate/:token` | 处理离线激活，生成响应文件 |
+| 方法   | 路径                                        | 说明                |
+|------|-------------------------------------------|-------------------|
+| POST | `/api/v1/register`                        | 注册用户（自动生成授权码）     |
+| POST | `/api/v1/login`                           | 帐密登录，返回 JWT Token |
+| POST | `/api/v1/verify`                          | 验证授权码状态（无需登录）     |
+| POST | `/api/v1/offline/verify`                  | 客户端验证离线响应文件       |
+| POST | `/api/v1/offline/request/gen`             | 生成离线激活请求          |
+| GET  | `/api/v1/offline/request/:token/download` | 下载离线请求文件          |
+| POST | `/api/v1/offline/activate/:token`         | 处理离线激活，生成响应文件     |
 
 ### 认证接口（需要 JWT Token，Header: `Authorization: Bearer <token>`）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/activate` | 在线激活（绑定设备指纹） |
-| GET  | `/api/v1/license/me` | 查看我的授权信息 |
-| GET  | `/api/v1/licenses` | 列出我的授权码 |
+| 方法   | 路径                   | 说明           |
+|------|----------------------|--------------|
+| POST | `/api/v1/activate`   | 在线激活（绑定设备指纹） |
+| GET  | `/api/v1/license/me` | 查看我的授权信息     |
+| GET  | `/api/v1/licenses`   | 列出我的授权码      |
 
 ### 管理员接口（需要 JWT Token）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/api/v1/admin/license` | 创建授权码 |
-| GET  | `/api/v1/admin/licenses?all=true` | 列出所有授权码 |
-| GET  | `/api/v1/admin/license/:licenseKey` | 查看授权码详情 |
-| PUT  | `/api/v1/admin/license/:licenseKey/revoke` | 撤销授权码 |
-| PUT  | `/api/v1/admin/license/:licenseKey/extend` | 延长授权有效期 |
-| GET  | `/api/v1/admin/license/:licenseKey/activations` | 查看激活记录 |
-| PUT  | `/api/v1/admin/license/:licenseKey/deactivate/:deviceFP` | 禁用指定设备 |
+| 方法   | 路径                                                       | 说明      |
+|------|----------------------------------------------------------|---------|
+| POST | `/api/v1/admin/license`                                  | 创建授权码   |
+| GET  | `/api/v1/admin/licenses?all=true`                        | 列出所有授权码 |
+| GET  | `/api/v1/admin/license/:licenseKey`                      | 查看授权码详情 |
+| PUT  | `/api/v1/admin/license/:licenseKey/revoke`               | 撤销授权码   |
+| PUT  | `/api/v1/admin/license/:licenseKey/extend`               | 延长授权有效期 |
+| GET  | `/api/v1/admin/license/:licenseKey/activations`          | 查看激活记录  |
+| PUT  | `/api/v1/admin/license/:licenseKey/deactivate/:deviceFP` | 禁用指定设备  |
 
 ## 在线激活流程
 
@@ -123,12 +124,12 @@ curl -X POST http://localhost:8080/api/v1/register \
 
 ## 环境变量
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| DB_TYPE | sqlite | 数据库类型：sqlite / mysql |
-| DB_DSN | license.db | 数据库连接串 |
-| HTTP_ADDR | :8080 | HTTP 监听地址 |
-| JWT_SECRET | change-me-in-production | JWT 签名密钥 |
+| 变量         | 默认值                     | 说明                   |
+|------------|-------------------------|----------------------|
+| DB_TYPE    | sqlite                  | 数据库类型：sqlite / mysql |
+| DB_DSN     | license.db              | 数据库连接串               |
+| HTTP_ADDR  | :8080                   | HTTP 监听地址            |
+| JWT_SECRET | change-me-in-production | JWT 签名密钥             |
 
 ## 生产部署建议
 

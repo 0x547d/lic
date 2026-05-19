@@ -12,7 +12,7 @@ COPY . .
 
 # 编译静态二进制（无 CGO，适合 Alpine）
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w" -o license-server .
+    go build -ldflags="-s -w" -o lic .
 
 # ---------- 运行阶段 ----------
 FROM alpine:3.19
@@ -22,7 +22,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # 从构建阶段复制二进制
-COPY --from=builder /app/license-server .
+COPY --from=builder /app/lic .
 
 # 复制模板、静态资源、RSA 密钥（如有）
 COPY templates/  ./templates/
@@ -37,4 +37,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["./license-server"]
+ENTRYPOINT ["./lic"]
