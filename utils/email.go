@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"license-server/config"
-	"license-server/models"
+	"github.com/0x547d/lic/config"
+	"github.com/0x547d/lic/models"
 )
 
 // SendEmail 发送邮件（使用 SMTP）
@@ -46,7 +46,7 @@ func SendEmail(cfg *config.Config, to, subject, bodyHTML string) error {
 func sendWithSSL(addr string, auth smtp.Auth, from string, to []string, msg []byte) error {
 	// 端口 465 需要先在 TLS 连接上通信（SMTPS）
 	conn, err := tls.Dial("tcp", addr, &tls.Config{
-		MinVersion: tls.VersionTLS12,
+		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: false,
 	})
 	if err != nil {

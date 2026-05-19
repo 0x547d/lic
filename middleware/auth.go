@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"license-server/models"
-	"license-server/utils"
+	"github.com/0x547d/lic/models"
+	"github.com/0x547d/lic/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

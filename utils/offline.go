@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"time"
 
-	"license-server/models"
+	"github.com/0x547d/lic/models"
 )
 
 // BuildOfflineRequest 客户端生成离线激活请求文件内容

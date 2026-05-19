@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/http"
 
-	"license-server/config"
-	"license-server/handlers"
-	"license-server/middleware"
-	"license-server/utils"
+	"github.com/0x547d/lic/config"
+	"github.com/0x547d/lic/handlers"
+	"github.com/0x547d/lic/middleware"
+	"github.com/0x547d/lic/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -54,29 +54,23 @@ func main() {
 	licenseHandler := handlers.NewLicenseHandler(db)
 	webHandler := handlers.NewWebHandler(db, cfg)
 
-	// 手动触发到期检查（仅管理员，用于测试）
-	r.GET("/api/v1/admin/check-expiring", func(c *gin.Context) {
-		utils.RunCheckNow(db, cfg)
-		c.JSON(http.StatusOK, gin.H{"message": "expiration check triggered"})
-	})
-
 	// ===== Web 页面路由 =====
-	r.GET("/", webHandler.ApplyPage)             // 客户自助申请页面
-	r.GET("/admin/login", webHandler.AdminLoginPage)   // 管理后台登录页
+	r.GET("/", webHandler.ApplyPage)                         // 客户自助申请页面
+	r.GET("/admin/login", webHandler.AdminLoginPage)         // 管理后台登录页
 	r.GET("/admin/dashboard", webHandler.AdminDashboardPage) // 管理后台主页（前端鉴权）
 
 	// ===== 公开 API =====
 	public := r.Group("/api/v1")
 	{
-		public.POST("/register", authHandler.Register)              // 注册用户（自动生成授权码）
+		public.POST("/register", authHandler.Register)            // 注册用户（自动生成授权码）
 		public.POST("/login", authHandler.Login)                  // 帐密登录获取 Token
 		public.POST("/verify", authHandler.VerifyToken)           // 验证授权状态
 		public.POST("/offline/verify", authHandler.OfflineVerify) // 客户端验证离线响应文件
 		public.POST("/offline/request/gen", authHandler.OfflineRequestGen)
 		public.GET("/offline/request/:token/download", authHandler.OfflineRequestDownload)
 		public.POST("/offline/activate/:token", authHandler.OfflineActivate)
-		public.POST("/apply", webHandler.HandleApply)              // 客户提交授权申请
-		public.POST("/admin/web-login", webHandler.WebLogin)      // 管理后台登录（返回 Token）
+		public.POST("/apply", webHandler.HandleApply)        // 客户提交授权申请
+		public.POST("/admin/web-login", webHandler.WebLogin) // 管理后台登录（返回 Token）
 	}
 
 	// ===== 需要 JWT 认证的 API =====
@@ -88,15 +82,19 @@ func main() {
 		protected.GET("/licenses", licenseHandler.ListLicenses)
 	}
 
-	// ===== 管理员 API =====
+	// ===== 管理员 API（带 JWT 鉴权）=====
 	admin := r.Group("/api/v1/admin")
 	admin.Use(middleware.JWTAuth())
 	{
+		admin.GET("/check-expiring", func(c *gin.Context) {
+			utils.RunCheckNow(db, cfg)
+			c.JSON(http.StatusOK, gin.H{"message": "expiration check triggered"})
+		})
 		admin.POST("/license", licenseHandler.CreateLicense)
 		admin.GET("/licenses", licenseHandler.ListLicenses)
 		admin.GET("/license/:licenseKey", licenseHandler.GetLicense)
 		admin.PUT("/license/:licenseKey/revoke", licenseHandler.RevokeLicense)
-	admin.PUT("/license/:licenseKey/extend", licenseHandler.ExtendLicense)
+		admin.PUT("/license/:licenseKey/extend", licenseHandler.ExtendLicense)
 		admin.GET("/license/:licenseKey/activations", licenseHandler.ListActivations)
 		admin.PUT("/license/:licenseKey/deactivate/:deviceFP", licenseHandler.DeactivateDevice)
 		admin.GET("/logs", webHandler.ListOperationLogs)

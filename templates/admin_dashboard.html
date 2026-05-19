@@ -16,7 +16,7 @@ body{font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-ser
 .stat-card .num{font-size:28px;font-weight:700;color:#303133}
 .stat-card .label{font-size:13px;color:#909399;margin-top:4px}
 .card{background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:24px;margin-bottom:24px}
-.card-title{font-size:18px;font-weight:600;margin-bottom:20px;color:#303133;display:flex;justify-content:space-between;align-items:center}
+.card-title{font-size:18px;font-weight:600;margin-bottom:20px;color:#303133;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;font-size:14px;cursor:pointer;transition:all .2s;text-decoration:none}
 .btn-primary{background:#409eff;color:#fff}
 .btn-primary:hover{background:#66b1ff}
@@ -31,14 +31,17 @@ body{font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-ser
 .table-wrapper{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{background:#fafafa;color:#606266;font-weight:600;text-align:left;padding:12px;border-bottom:1px solid #ebeef5}
-td{padding:12px;border-bottom:1px solid #ebeef5;color:#606266}
+td{padding:12px;border-bottom:1px solid #ebeef5;color:#606266;font-size:13px}
 tr:hover td{background:#f5f7fa}
 .tag{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;font-weight:500}
 .tag-active{background:#f0f9eb;color:#67c23a}
 .tag-expired{background:#fef0f0;color:#f56c6c}
 .tag-disabled{background:#fdf6ec;color:#e6a23c}
 .tag-revoked{background:#f4f4f5;color:#909399}
-.search-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center}
+.tag-permanent{background:#fdf6ec;color:#e6a23c}
+.tag-notify-ok{background:#f0f9eb;color:#67c23a;margin:2px 0;display:inline-block;font-size:11px;padding:1px 6px;}
+.tag-notify-wait{background:#fef0f0;color:#f56c6c;margin:2px 0;display:inline-block;font-size:11px;padding:1px 6px;}
+.search-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center;flex-wrap:wrap}
 .search-bar input{flex:1;max-width:300px;padding:8px 12px;border:1px solid #dcdfe6;border-radius:4px;font-size:14px}
 .search-bar input:focus{outline:none;border-color:#409eff}
 .alert{padding:12px 16px;border-radius:4px;margin-bottom:20px;font-size:14px;display:none}
@@ -57,6 +60,13 @@ tr:hover td{background:#f5f7fa}
 .pagination button{padding:6px 12px;border:1px solid #dcdfe6;background:#fff;border-radius:4px;cursor:pointer;font-size:13px}
 .pagination button.active{background:#409eff;color:#fff;border-color:#409eff}
 .empty-state{text-align:center;padding:60px 0;color:#909399;font-size:14px}
+.tabs{display:flex;gap:0;border-bottom:2px solid #e4e7ed;margin-bottom:24px}
+.tab{padding:12px 24px;font-size:15px;font-weight:500;color:#909399;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{color:#409eff}
+.tab.active{color:#409eff;border-bottom-color:#409eff}
+.log-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.log-filter label{font-size:13px;color:#606266}
+.log-filter input[type="date"]{padding:4px 8px;border:1px solid #dcdfe6;border-radius:4px;font-size:13px}
 </style>
 </head>
 <body>
@@ -92,34 +102,88 @@ tr:hover td{background:#f5f7fa}
   <div class="alert alert-success" id="successAlert"></div>
   <div class="alert alert-error" id="errorAlert"></div>
 
-  <div class="card">
-    <div class="card-title">
-      <span>授权码列表</span>
-      <button class="btn btn-primary" onclick="showCreateModal()">+ 新建授权码</button>
+  <!-- 标签页导航 -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('licenses', this)">授权码管理</div>
+    <div class="tab" onclick="switchTab('logs', this)">操作日志</div>
+  </div>
+
+  <!-- 授权码管理标签页 -->
+  <div id="tab-licenses">
+    <div class="card">
+      <div class="card-title">
+        <span>授权码列表</span>
+        <button class="btn btn-primary" onclick="showCreateModal()">+ 新建授权码</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="搜索授权码 / 用户名..." onkeyup="if(event.key==='Enter') loadLicenses()">
+        <button class="btn btn-primary" onclick="loadLicenses()">搜索</button>
+        <button class="btn" style="background:#f4f4f5;color:#606266" onclick="resetSearch()">重置</button>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>授权码</th>
+              <th>用户</th>
+              <th>状态</th>
+              <th>永久</th>
+              <th>激活数</th>
+              <th>有效期</th>
+              <th>通知状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="licenseTableBody">
+            <tr><td colspan="8" style="text-align:center;color:#909399;padding:40px;">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
     </div>
-    <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="搜索授权码 / 用户名..." onkeyup="if(event.key==='Enter') loadLicenses()">
-      <button class="btn btn-primary" onclick="loadLicenses()">搜索</button>
-      <button class="btn" style="background:#f4f4f5;color:#606266" onclick="resetSearch()">重置</button>
+  </div>
+
+  <!-- 操作日志标签页 -->
+  <div id="tab-logs" style="display:none;">
+    <div class="card">
+      <div class="card-title">
+        <span>操作日志</span>
+        <div class="log-filter">
+          <select id="logActionFilter" onchange="loadLogs(1)">
+            <option value="">全部操作</option>
+            <option value="create">创建授权码</option>
+            <option value="revoke">撤销授权码</option>
+            <option value="extend">延长授权</option>
+            <option value="activate">激活设备</option>
+            <option value="deactivate">停用设备</option>
+          </select>
+          <label>从</label>
+          <input type="date" id="logStartTime">
+          <label>至</label>
+          <input type="date" id="logEndTime">
+          <button class="btn" style="background:#f4f4f5;color:#606266;" onclick="loadLogs(1)">查询</button>
+          <button class="btn" style="background:#f4f4f5;color:#606266;" onclick="resetLogFilter()">重置</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>管理员</th>
+              <th>操作类型</th>
+              <th>操作对象</th>
+              <th>详情</th>
+              <th>IP 地址</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody">
+            <tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">点击"操作日志"标签页加载数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination" id="logPagination"></div>
     </div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>授权码</th>
-            <th>用户</th>
-            <th>状态</th>
-            <th>激活数</th>
-            <th>有效期</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="licenseTableBody">
-          <tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">加载中...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="pagination" id="pagination"></div>
   </div>
 </div>
 
@@ -128,11 +192,11 @@ tr:hover td{background:#f5f7fa}
   <div class="modal">
     <h3>新建授权码</h3>
     <div class="form-group">
-      <label>用户ID 或 用户名</label>
-      <input type="text" id="createUser" placeholder="输入用户ID 或 用户名（留空则自动创建新用户）">
+      <label>用户ID 或 用户名（留空则自动创建新用户）</label>
+      <input type="text" id="createUser" placeholder="输入用户ID 或 用户名">
     </div>
     <div class="form-group">
-      <label>授权时长（月）*</label>
+      <label>授权时长 *</label>
       <select id="createDuration">
         <option value="1">1 个月</option>
         <option value="3">3 个月</option>
@@ -140,7 +204,7 @@ tr:hover td{background:#f5f7fa}
         <option value="12" selected>12 个月</option>
         <option value="24">24 个月</option>
         <option value="36">36 个月</option>
-        <option value="1188">长期（99年）</option>
+        <option value="0">永久有效</option>
       </select>
     </div>
     <div class="form-group">
@@ -205,6 +269,15 @@ async function api(path, options = {}) {
   return resp.json();
 }
 
+// 切换标签页
+function switchTab(tab, el) {
+  document.getElementById('tab-licenses').style.display = tab === 'licenses' ? 'block' : 'none';
+  document.getElementById('tab-logs').style.display = tab === 'logs' ? 'block' : 'none';
+  document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'logs') loadLogs();
+}
+
 // 加载授权码列表
 async function loadLicenses() {
   const keyword = document.getElementById('searchInput').value;
@@ -221,18 +294,28 @@ async function loadLicenses() {
 function renderTable(licenses) {
   const tbody = document.getElementById('licenseTableBody');
   if (licenses.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">暂无数据</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#909399;padding:40px;">暂无数据</td></tr>';
     return;
   }
   tbody.innerHTML = licenses.map(l => {
     const statusMap = { active:'有效', expired:'已过期', disabled:'已禁用', revoked:'已撤销' };
     const statusClass = { active:'tag-active', expired:'tag-expired', disabled:'tag-disabled', revoked:'tag-revoked' };
+    const permanentBadge = l.is_permanent ? '<span class="tag tag-permanent">永久</span>' : '';
+    let notifyHtml = '';
+    if (l.notified_7days) notifyHtml += '<div class="tag tag-notify-ok">已提醒7天</div>';
+    else notifyHtml += '<div class="tag tag-notify-wait">未提醒7天</div>';
+    if (l.notified_1day) notifyHtml += '<div class="tag tag-notify-ok">已提醒1天</div>';
+    else notifyHtml += '<div class="tag tag-notify-wait">未提醒1天</div>';
+    if (l.notified_expired) notifyHtml += '<div class="tag tag-notify-ok">已通知过期</div>';
+    else notifyHtml += '<div class="tag tag-notify-wait">未通知过期</div>';
     return `<tr>
       <td><code style="background:#f4f4f5;padding:2px 6px;border-radius:3px;font-size:13px;">${l.license_key}</code></td>
       <td>${l.username || l.user_id || '-'}</td>
       <td><span class="tag ${statusClass[l.status]||''}">${statusMap[l.status]||l.status}</span></td>
+      <td>${permanentBadge}</td>
       <td>${l.activated_count || 0} / ${l.max_activations || '∞'}</td>
-      <td style="font-size:13px;">${l.valid_from ? l.valid_from.substring(0,10) : '-'} 至<br>${l.valid_to ? l.valid_to.substring(0,10) : '-'}</td>
+      <td style="font-size:13px;">${l.valid_from ? l.valid_from.substring(0,10) : '-'}<br>${l.valid_to ? l.valid_to.substring(0,10) : '-'}</td>
+      <td>${notifyHtml}</td>
       <td>
         <button class="btn btn-sm btn-warning" onclick="showExtendModal('${l.license_key}')">延期</button>
         <button class="btn btn-sm btn-danger" onclick="revokeLicense('${l.license_key}')" style="margin-left:6px;">撤销</button>
@@ -254,7 +337,12 @@ async function createLicense() {
   const duration = parseInt(document.getElementById('createDuration').value);
   const maxAct = parseInt(document.getElementById('createMaxAct').value);
 
-  const body = { valid_days: duration * 30, max_activations: maxAct };
+  const body = { max_activations: maxAct };
+  if (duration === 0) {
+    body.valid_months = 0;  // 永久
+  } else {
+    body.valid_months = duration;
+  }
   if (user) {
     if (isNaN(parseInt(user))) body.username = user;
     else body.user_id = parseInt(user);
@@ -294,7 +382,7 @@ async function extendLicense() {
   const months = parseInt(document.getElementById('extendMonths').value);
   const result = await api('/api/v1/admin/license/' + currentLicenseKey + '/extend', {
     method: 'PUT',
-    body: JSON.stringify({ extra_days: months * 30 })
+    body: JSON.stringify({ extra_months: months })
   });
   if (result && result.message) {
     showSuccess('授权已延长 ' + months + ' 个月');
@@ -303,6 +391,70 @@ async function extendLicense() {
   } else {
     showError((result && result.error) || '操作失败');
   }
+}
+
+// 加载操作日志
+let logPage = 1;
+
+async function loadLogs(page) {
+  if (page) logPage = page;
+  const action = document.getElementById('logActionFilter').value;
+  const startTime = document.getElementById('logStartTime').value;
+  const endTime = document.getElementById('logEndTime').value;
+  const tbody = document.getElementById('logTableBody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">加载中...</td></tr>';
+  let url = '/api/v1/admin/logs?page=' + logPage;
+  if (action) url += '&action=' + encodeURIComponent(action);
+  if (startTime) url += '&start_time=' + encodeURIComponent(startTime);
+  if (endTime) url += '&end_time=' + encodeURIComponent(endTime);
+  const data = await api(url);
+  if (!data) return;
+  renderLogs(data.logs || [], data.total || 0, data.page || 1, data.page_size || 20);
+}
+
+function renderLogs(logs, total, page, pageSize) {
+  const tbody = document.getElementById('logTableBody');
+  if (logs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">暂无数据</td></tr>';
+    document.getElementById('logPagination').innerHTML = '';
+    return;
+  }
+  tbody.innerHTML = logs.map(l => {
+    const time = l.created_at ? l.created_at.replace('T', ' ').substring(0, 19) : '-';
+    return `<tr>
+      <td style="font-size:13px;white-space:nowrap;">${time}</td>
+      <td>${l.admin_name || '-'}</td>
+      <td><span class="tag tag-active">${l.action || '-'}</span></td>
+      <td>${l.target || '-'}</td>
+      <td style="font-size:13px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.detail || ''}">${l.detail || '-'}</td>
+      <td style="font-size:13px;font-family:monospace;">${l.ip || '-'}</td>
+    </tr>`;
+  }).join('');
+  renderLogPagination(total, page, pageSize);
+}
+
+function renderLogPagination(total, page, pageSize) {
+  const totalPages = Math.ceil(total / pageSize) || 1;
+  const container = document.getElementById('logPagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  let html = '';
+  if (page > 1) html += '<button onclick="loadLogs(' + (page-1) + ')">上一页</button>';
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - page) <= 2) {
+      html += '<button class="' + (i === page ? 'active' : '') + '" onclick="loadLogs(' + i + ')">' + i + '</button>';
+    } else if (i === page - 3 || i === page + 3) {
+      html += '<button disabled>...</button>';
+    }
+  }
+  if (page < totalPages) html += '<button onclick="loadLogs(' + (page+1) + ')">下一页</button>';
+  container.innerHTML = html;
+}
+
+function resetLogFilter() {
+  document.getElementById('logActionFilter').value = '';
+  document.getElementById('logStartTime').value = '';
+  document.getElementById('logEndTime').value = '';
+  loadLogs(1);
 }
 
 // 弹窗

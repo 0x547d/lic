@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
-	"license-server/config"
-	"license-server/models"
-	"license-server/utils"
+	"github.com/0x547d/lic/config"
+	"github.com/0x547d/lic/models"
+	"github.com/0x547d/lic/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -95,7 +96,7 @@ func (h *WebHandler) HandleApply(c *gin.Context) {
 	}
 	record := models.ApplyRecord{
 		ApplicantName:  req.ApplicantName,
-		Email:         req.Email,
+		Email:          req.Email,
 		Phone:          req.Phone,
 		ProductType:    req.ProductType,
 		DurationMonths: req.DurationMonths,
@@ -168,8 +169,8 @@ func (h *WebHandler) ApproveApplication(c *gin.Context) {
 	// 更新申请记录
 	h.DB.Model(&record).Updates(map[string]interface{}{
 		"status":      "approved",
-		"license_key":  license.LicenseKey,
-		"admin_note":   c.PostForm("admin_note"),
+		"license_key": license.LicenseKey,
+		"admin_note":  c.PostForm("admin_note"),
 	})
 
 	// 发邮件通知申请人
@@ -204,7 +205,7 @@ func (h *WebHandler) RejectApplication(c *gin.Context) {
 	adminNote := c.PostForm("admin_note")
 	h.DB.Model(&record).Updates(map[string]interface{}{
 		"status":     "rejected",
-		"admin_note":  adminNote,
+		"admin_note": adminNote,
 	})
 
 	// 发邮件通知申请人
@@ -220,9 +221,48 @@ func (h *WebHandler) RejectApplication(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "申请已拒绝，邮件已发送至申请人"})
 }
 
-// ListOperationLogs 查看操作日志
+// ListOperationLogs 查看操作日志（支持分页和筛选）
 func (h *WebHandler) ListOperationLogs(c *gin.Context) {
+	page := 1
+	pageSize := 20
+	if v := c.DefaultQuery("page", "1"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := c.DefaultQuery("page_size", "20"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+			pageSize = n
+		}
+	}
+	action := c.Query("action")
+
+	query := h.DB.Model(&models.OperationLog{})
+	if action != "" {
+		query = query.Where("action = ?", action)
+	}
+	if v := c.Query("start_time"); v != "" {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			query = query.Where("created_at >= ?", t)
+		}
+	}
+	if v := c.Query("end_time"); v != "" {
+		if t, err := time.Parse("2006-01-02", v); err == nil {
+			query = query.Where("created_at < ?", t.AddDate(0, 0, 1))
+		}
+	}
+
+	var total int64
+	query.Count(&total)
+
 	var logs []models.OperationLog
-	h.DB.Order("id DESC").Limit(200).Find(&logs)
-	c.JSON(http.StatusOK, gin.H{"logs": logs})
+	offset := (page - 1) * pageSize
+	query.Order("id DESC").Limit(pageSize).Offset(offset).Find(&logs)
+
+	c.JSON(http.StatusOK, gin.H{
+		"logs":      logs,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }

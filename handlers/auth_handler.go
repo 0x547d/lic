@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"license-server/models"
-	"license-server/utils"
+	"github.com/0x547d/lic/models"
+	"github.com/0x547d/lic/utils"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -64,9 +64,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":      token,
-		"user_id":    user.ID,
-		"username":   user.Username,
+		"token":       token,
+		"user_id":     user.ID,
+		"username":    user.Username,
 		"license_key": licenseKey,
 		"expires_in":  int(utils.JWTExpire.Seconds()),
 	})
@@ -100,10 +100,10 @@ func (h *AuthHandler) VerifyToken(c *gin.Context) {
 
 	valid := license.IsValid()
 	resp := gin.H{
-		"valid":     valid,
-		"status":    string(license.Status),
-		"valid_from": license.ValidFrom,
-		"valid_to":   license.ValidTo,
+		"valid":       valid,
+		"status":      string(license.Status),
+		"valid_from":  license.ValidFrom,
+		"valid_to":    license.ValidTo,
 		"license_key": license.LicenseKey,
 	}
 	if !valid {
@@ -158,7 +158,7 @@ func (h *AuthHandler) ActivateOnline(c *gin.Context) {
 	// 创建激活记录
 	activation := models.Activation{
 		LicenseID:         license.ID,
-		DeviceFingerprint:  req.DeviceFingerprint,
+		DeviceFingerprint: req.DeviceFingerprint,
 		Method:            models.ActivationMethodOnline,
 		ActivatedAt:       time.Now(),
 		LastVerifiedAt:    time.Now(),
@@ -180,9 +180,9 @@ func (h *AuthHandler) ActivateOnline(c *gin.Context) {
 	h.DB.Model(&license).Update("hardware_ids", hwIDs)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "activation successful",
+		"message":       "activation successful",
 		"activation_id": activation.ID,
-		"valid_to":     license.ValidTo,
+		"valid_to":      license.ValidTo,
 	})
 }
 
@@ -228,11 +228,11 @@ func (h *AuthHandler) OfflineRequestGen(c *gin.Context) {
 	reqJSON, _ := utils.EncodeRequestFile(reqFile)
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "offline request created",
-		"request_token":  offlineReq.RequestToken,
-		"request_file":   string(reqJSON),
-		"download_url":   "/api/v1/offline/request/" + offlineReq.RequestToken + "/download",
-		"expires_at":     offlineReq.ExpiresAt,
-		"instructions":   "将此请求文件内容保存到 request.json，在联网机器上执行离线激活",
+		"request_token": offlineReq.RequestToken,
+		"request_file":  string(reqJSON),
+		"download_url":  "/api/v1/offline/request/" + offlineReq.RequestToken + "/download",
+		"expires_at":    offlineReq.ExpiresAt,
+		"instructions":  "将此请求文件内容保存到 request.json，在联网机器上执行离线激活",
 	})
 }
 
@@ -311,7 +311,7 @@ func (h *AuthHandler) OfflineActivate(c *gin.Context) {
 	if err != nil {
 		activation := models.Activation{
 			LicenseID:         license.ID,
-			DeviceFingerprint:  offlineReq.DeviceFingerprint,
+			DeviceFingerprint: offlineReq.DeviceFingerprint,
 			Method:            models.ActivationMethodOffline,
 			ActivatedAt:       time.Now(),
 			LastVerifiedAt:    time.Now(),
@@ -356,7 +356,7 @@ func (h *AuthHandler) OfflineVerify(c *gin.Context) {
 	now := time.Now()
 	if now.Before(resp.ValidFrom) || now.After(resp.ValidTo) {
 		c.JSON(http.StatusForbidden, gin.H{
-			"error":     "license expired",
+			"error":      "license expired",
 			"valid_from": resp.ValidFrom,
 			"valid_to":   resp.ValidTo,
 		})
@@ -423,18 +423,18 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// 自动生成默认授权码（1年有效，1台设备）
 	license := models.License{
-		UserID:          user.ID,
-		Status:          models.LicenseStatusActive,
-		MaxActivations:  1,
-		ValidFrom:       time.Now(),
-		ValidTo:         time.Now().Add(365 * 24 * time.Hour),
-		HardwareIDs:     models.JSONSlice{},
+		UserID:         user.ID,
+		Status:         models.LicenseStatusActive,
+		MaxActivations: 1,
+		ValidFrom:      time.Now(),
+		ValidTo:        time.Now().Add(365 * 24 * time.Hour),
+		HardwareIDs:    models.JSONSlice{},
 	}
 	h.DB.Create(&license)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":     "registration successful",
 		"user_id":     user.ID,
-		"license_key":  license.LicenseKey,
+		"license_key": license.LicenseKey,
 	})
 }

@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
-	"license-server/config"
-	"license-server/models"
+	"github.com/0x547d/lic/config"
+	"github.com/0x547d/lic/models"
 
 	"github.com/robfig/cron/v3"
 	"gorm.io/gorm"
@@ -127,7 +127,7 @@ func sendExpiredNotice(db *gorm.DB, cfg *config.Config, lic *models.License) {
 	// 标记已通知，同时更新授权状态为 expired
 	db.Model(lic).Updates(map[string]interface{}{
 		"notified_expired": true,
-		"status":            models.LicenseStatusExpired,
+		"status":           models.LicenseStatusExpired,
 	})
 
 	log.Printf("[Scheduler] 已发送过期通知邮件 to=%s license_key=%s", user.Email, lic.LicenseKey)

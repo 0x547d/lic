@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"license-server/models"
-	"license-server/utils"
+	"github.com/0x547d/lic/models"
+	"github.com/0x547d/lic/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -23,10 +23,11 @@ func NewLicenseHandler(db *gorm.DB) *LicenseHandler {
 
 // CreateLicenseRequest 创建授权码请求
 type CreateLicenseRequest struct {
-	UserID         uint     `json:"user_id"`
-	Username       string   `json:"username"`       // 可选，用用户名查找
-	MaxActivations int      `json:"max_activations" binding:"required,min=1"`
-	ValidDays      int      `json:"valid_days"      binding:"required,min=1"` // 有效期天数
+	UserID         uint   `json:"user_id"`
+	Username       string `json:"username"` // 可选，用用户名查找
+	MaxActivations int    `json:"max_activations" binding:"required,min=1"`
+	ValidMonths    int    `json:"valid_months"` // 按月（优先），0 或负数表示永久
+	ValidDays      int    `json:"valid_days"`   // 按天（兼容旧版）
 }
 
 // CreateLicense 创建新授权码（管理员功能）
@@ -61,31 +62,49 @@ func (h *LicenseHandler) CreateLicense(c *gin.Context) {
 
 	now := time.Now()
 	license := models.License{
-		UserID:          user.ID,
-		LicenseKey:      uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8],
-		Status:          models.LicenseStatusActive,
-		MaxActivations:  req.MaxActivations,
-		ActivatedCount:  0,
-		ValidFrom:       now,
-		ValidTo:         now.Add(time.Duration(req.ValidDays) * 24 * time.Hour),
-		HardwareIDs:     models.JSONSlice{},
+		UserID:         user.ID,
+		LicenseKey:     uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8],
+		Status:         models.LicenseStatusActive,
+		MaxActivations: req.MaxActivations,
+		ActivatedCount: 0,
+		ValidFrom:      now,
+		HardwareIDs:    models.JSONSlice{},
 	}
+
+	if req.ValidMonths == 0 {
+		// 永久有效
+		license.IsPermanent = true
+		license.ValidTo = time.Date(2099, 12, 31, 23, 59, 59, 0, time.UTC)
+	} else if req.ValidMonths > 0 {
+		license.ValidTo = now.AddDate(0, req.ValidMonths, 0)
+	} else if req.ValidDays > 0 {
+		license.ValidTo = now.Add(time.Duration(req.ValidDays) * 24 * time.Hour)
+	} else {
+		// 默认 365 天
+		license.ValidTo = now.AddDate(0, 12, 0)
+	}
+
 	h.DB.Create(&license)
 
 	adminID := c.GetUint("user_id")
 	adminName := c.GetString("username")
+	permanentStr := ""
+	if license.IsPermanent {
+		permanentStr = "（永久有效）"
+	}
 	utils.LogOperation(h.DB, adminID, adminName, "create", license.LicenseKey,
-		fmt.Sprintf("创建授权码，有效期至 %s，最大激活数 %d",
-			license.ValidTo.Format("2006-01-02"), license.MaxActivations),
+		fmt.Sprintf("创建授权码，有效期至 %s%s，最大激活数 %d",
+			license.ValidTo.Format("2006-01-02"), permanentStr, license.MaxActivations),
 		c.ClientIP())
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":     "license created",
-		"license_key":  license.LicenseKey,
-		"user_id":     user.ID,
-		"username":    user.Username,
-		"valid_from":  license.ValidFrom,
-		"valid_to":    license.ValidTo,
+		"message":         "license created",
+		"license_key":     license.LicenseKey,
+		"user_id":         user.ID,
+		"username":        user.Username,
+		"valid_from":      license.ValidFrom,
+		"valid_to":        license.ValidTo,
+		"is_permanent":    license.IsPermanent,
 		"max_activations": license.MaxActivations,
 	})
 }
@@ -95,7 +114,9 @@ func (h *LicenseHandler) ListLicenses(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	keyword := c.Query("keyword")
 	page := c.GetInt("page")
-	if page < 1 { page = 1 }
+	if page < 1 {
+		page = 1
+	}
 	pageSize := 10
 
 	query := h.DB.Model(&models.License{})
@@ -166,9 +187,9 @@ func (h *LicenseHandler) GetLicense(c *gin.Context) {
 	h.DB.Where("license_id = ? AND is_active = ?", license.ID, true).Find(&activations)
 
 	c.JSON(http.StatusOK, gin.H{
-		"license":      license,
-		"activations":  activations,
-		"is_valid":     license.IsValid(),
+		"license":     license,
+		"activations": activations,
+		"is_valid":    license.IsValid(),
 	})
 }
 
@@ -192,11 +213,13 @@ func (h *LicenseHandler) RevokeLicense(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "license revoked"})
 }
 
-// ExtendLicense 延长授权码有效期
+// ExtendLicenseRequest 延长授权码有效期请求
 type ExtendLicenseRequest struct {
-	ExtraDays int `json:"extra_days" binding:"required,min=1"`
+	ExtraMonths int `json:"extra_months"` // 按月（优先）
+	ExtraDays   int `json:"extra_days"`   // 按天（兼容旧版）
 }
 
+// ExtendLicense 延长授权码有效期
 func (h *LicenseHandler) ExtendLicense(c *gin.Context) {
 	licenseKey := c.Param("licenseKey")
 	var req ExtendLicenseRequest
@@ -211,18 +234,31 @@ func (h *LicenseHandler) ExtendLicense(c *gin.Context) {
 		return
 	}
 
-	newValidTo := license.ValidTo.Add(time.Duration(req.ExtraDays) * 24 * time.Hour)
+	var newValidTo time.Time
+	if license.IsPermanent {
+		// 已是永久授权，无需延长
+		newValidTo = license.ValidTo
+	} else if req.ExtraMonths > 0 {
+		newValidTo = license.ValidTo.AddDate(0, req.ExtraMonths, 0)
+	} else if req.ExtraDays > 0 {
+		newValidTo = license.ValidTo.Add(time.Duration(req.ExtraDays) * 24 * time.Hour)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "extra_months or extra_days required"})
+		return
+	}
+
 	h.DB.Model(&license).Update("valid_to", newValidTo)
 
 	adminID := c.GetUint("user_id")
 	adminName := c.GetString("username")
 	utils.LogOperation(h.DB, adminID, adminName, "extend", licenseKey,
-		fmt.Sprintf("延长 %d 天，新的有效期至 %s", req.ExtraDays, newValidTo.Format("2006-01-02")),
+		fmt.Sprintf("延长，新的有效期至 %s", newValidTo.Format("2006-01-02")),
 		c.ClientIP())
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "license extended",
-		"valid_to":   newValidTo,
+		"message":      "license extended",
+		"valid_to":     newValidTo,
+		"is_permanent": license.IsPermanent,
 	})
 }
 

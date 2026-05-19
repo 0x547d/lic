@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"license-server/models"
+	"github.com/0x547d/lic/models"
 	"gorm.io/gorm"
 )
 
