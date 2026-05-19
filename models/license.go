@@ -31,9 +31,9 @@ const (
 // User 用户表（用于帐密登录）
 type User struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	Username  string    `gorm:"uniqueIndex;size:64;not null" json:"username"`
-	Password  string    `gorm:"size:128;not null" json:"-"` // bcrypt 哈希
-	Email     string    `gorm:"size:128" json:"email"`
+	Username  string    `gorm:"uniqueIndex;size:64;not null" json:"username"` // 公司/个人名称
+	Password  string    `gorm:"size:128;not null" json:"-"`                   // bcrypt 哈希
+	Email     string    `gorm:"uniqueIndex;size:128" json:"email"`            // 添加唯一索引
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	Licenses  []License `gorm:"foreignKey:UserID" json:"-"`

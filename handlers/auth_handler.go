@@ -98,13 +98,27 @@ func (h *AuthHandler) VerifyToken(c *gin.Context) {
 		return
 	}
 
+	// 查询关联的用户信息（获取公司/个人名称）
+	var user models.User
+	h.DB.First(&user, license.UserID)
+
 	valid := license.IsValid()
+	remaining := license.MaxActivations - license.ActivatedCount
+	if remaining < 0 {
+		remaining = 0
+	}
+
 	resp := gin.H{
-		"valid":       valid,
-		"status":      string(license.Status),
-		"valid_from":  license.ValidFrom,
-		"valid_to":    license.ValidTo,
-		"license_key": license.LicenseKey,
+		"valid":           valid,
+		"status":          string(license.Status),
+		"valid_from":      license.ValidFrom,
+		"valid_to":        license.ValidTo,
+		"license_key":     license.LicenseKey,
+		"company":         user.Username,          // 公司/个人名称（即username字段）
+		"product_keys":    license.ProductKeys,    // 产品类型列表
+		"activated_count": license.ActivatedCount, // 已激活设备数量
+		"max_activations": license.MaxActivations, // 最大激活数
+		"remaining_quota": remaining,              // 剩余额度
 	}
 	if !valid {
 		resp["reason"] = h.getInvalidReason(&license)
@@ -401,11 +415,21 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// 检查用户名是否已存在
 	var count int64
 	h.DB.Model(&models.User{}).Where("username = ?", req.Username).Count(&count)
 	if count > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
 		return
+	}
+
+	// 检查邮箱是否已存在（如果提供了邮箱）
+	if req.Email != "" {
+		h.DB.Model(&models.User{}).Where("email = ?", req.Email).Count(&count)
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "email already exists"})
+			return
+		}
 	}
 
 	hash, err := utils.HashPassword(req.Password)
