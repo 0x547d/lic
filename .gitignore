@@ -2,6 +2,9 @@
 # https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
 #
 # Binaries for programs and plugins
+# Binaries
+lic
+cmd/example_client/example_client
 *.exe
 *.exe~
 *.dll
@@ -24,9 +27,55 @@ profile.cov
 go.work
 go.work.sum
 
+# Dependency directories
+vendor/
+
+# Environment files
 # env file
 .env
+.env.local
+.env.*.local
+
+# RSA keys
+rsa_key*
+rsa_pub*
+private_key.pem
+public_key.pem
+*.pem
+
+# Database files
+*.db
+*.db-journal
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Editor/IDE
 # .idea/
 # .vscode/
+# WorkBuddy
+.workbuddy/
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

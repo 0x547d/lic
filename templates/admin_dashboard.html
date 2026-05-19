@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 - License Server</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#f5f7fa;color:#333}
+.navbar{background:#fff;border-bottom:1px solid #e4e7ed;padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.navbar .logo{font-size:20px;font-weight:700;color:#409eff;text-decoration:none}
+.navbar .user-info{font-size:14px;color:#606266}
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border-radius:8px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.stat-card .num{font-size:28px;font-weight:700;color:#303133}
+.stat-card .label{font-size:13px;color:#909399;margin-top:4px}
+.card{background:#fff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.08);padding:24px;margin-bottom:24px}
+.card-title{font-size:18px;font-weight:600;margin-bottom:20px;color:#303133;display:flex;justify-content:space-between;align-items:center}
+.btn{display:inline-block;padding:8px 16px;border:none;border-radius:4px;font-size:14px;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-primary{background:#409eff;color:#fff}
+.btn-primary:hover{background:#66b1ff}
+.btn-success{background:#67c23a;color:#fff}
+.btn-success:hover{background:#85ce61}
+.btn-warning{background:#e6a23c;color:#fff}
+.btn-warning:hover{background:#ebb563}
+.btn-danger{background:#f56c6c;color:#fff}
+.btn-danger:hover{background:#f78989}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.table-wrapper{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#fafafa;color:#606266;font-weight:600;text-align:left;padding:12px;border-bottom:1px solid #ebeef5}
+td{padding:12px;border-bottom:1px solid #ebeef5;color:#606266}
+tr:hover td{background:#f5f7fa}
+.tag{display:inline-block;padding:2px 10px;border-radius:3px;font-size:12px;font-weight:500}
+.tag-active{background:#f0f9eb;color:#67c23a}
+.tag-expired{background:#fef0f0;color:#f56c6c}
+.tag-disabled{background:#fdf6ec;color:#e6a23c}
+.tag-revoked{background:#f4f4f5;color:#909399}
+.search-bar{display:flex;gap:12px;margin-bottom:20px;align-items:center}
+.search-bar input{flex:1;max-width:300px;padding:8px 12px;border:1px solid #dcdfe6;border-radius:4px;font-size:14px}
+.search-bar input:focus{outline:none;border-color:#409eff}
+.alert{padding:12px 16px;border-radius:4px;margin-bottom:20px;font-size:14px;display:none}
+.alert-success{background:#f0f9eb;color:#67c23a;border:1px solid #e1f3d8}
+.alert-error{background:#fef0f0;color:#f56c6c;border:1px solid #fde2e2}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:8px;padding:24px;width:500px;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:20px;color:#303133}
+.modal .form-group{margin-bottom:16px}
+.modal .form-group label{display:block;font-size:14px;color:#606266;margin-bottom:6px;font-weight:500}
+.modal .form-group input,.modal .form-group select{padding:8px 12px;border:1px solid #dcdfe6;border-radius:4px;font-size:14px;width:100%}
+.modal .form-group input:focus,.modal .form-group select:focus{outline:none;border-color:#409eff}
+.modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px}
+.pagination{display:flex;gap:8px;justify-content:center;margin-top:20px}
+.pagination button{padding:6px 12px;border:1px solid #dcdfe6;background:#fff;border-radius:4px;cursor:pointer;font-size:13px}
+.pagination button.active{background:#409eff;color:#fff;border-color:#409eff}
+.empty-state{text-align:center;padding:60px 0;color:#909399;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="navbar">
+  <a href="/admin/dashboard" class="logo">🔐 License 管理系统</a>
+  <div class="user-info">
+    <span id="username"></span>
+    <a href="#" onclick="logout()" style="margin-left:16px;font-size:13px;color:#f56c6c;">退出登录</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num" id="statTotal">-</div>
+      <div class="label">授权码总数</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statActive">-</div>
+      <div class="label">有效授权</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statExpired">-</div>
+      <div class="label">已过期</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="statActivations">-</div>
+      <div class="label">活跃设备数</div>
+    </div>
+  </div>
+
+  <div class="alert alert-success" id="successAlert"></div>
+  <div class="alert alert-error" id="errorAlert"></div>
+
+  <div class="card">
+    <div class="card-title">
+      <span>授权码列表</span>
+      <button class="btn btn-primary" onclick="showCreateModal()">+ 新建授权码</button>
+    </div>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索授权码 / 用户名..." onkeyup="if(event.key==='Enter') loadLicenses()">
+      <button class="btn btn-primary" onclick="loadLicenses()">搜索</button>
+      <button class="btn" style="background:#f4f4f5;color:#606266" onclick="resetSearch()">重置</button>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>授权码</th>
+            <th>用户</th>
+            <th>状态</th>
+            <th>激活数</th>
+            <th>有效期</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="licenseTableBody">
+          <tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- 新建授权码弹窗 -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal">
+    <h3>新建授权码</h3>
+    <div class="form-group">
+      <label>用户ID 或 用户名</label>
+      <input type="text" id="createUser" placeholder="输入用户ID 或 用户名（留空则自动创建新用户）">
+    </div>
+    <div class="form-group">
+      <label>授权时长（月）*</label>
+      <select id="createDuration">
+        <option value="1">1 个月</option>
+        <option value="3">3 个月</option>
+        <option value="6">6 个月</option>
+        <option value="12" selected>12 个月</option>
+        <option value="24">24 个月</option>
+        <option value="36">36 个月</option>
+        <option value="1188">长期（99年）</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>最大激活设备数 *</label>
+      <select id="createMaxAct">
+        <option value="1" selected>1 台</option>
+        <option value="3">3 台</option>
+        <option value="5">5 台</option>
+        <option value="10">10 台</option>
+        <option value="0">无限制</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:#f4f4f5;color:#606266" onclick="hideCreateModal()">取消</button>
+      <button class="btn btn-primary" onclick="createLicense()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 延期弹窗 -->
+<div class="modal-overlay" id="extendModal">
+  <div class="modal">
+    <h3>延长授权有效期</h3>
+    <div class="form-group">
+      <label>延长（月）*</label>
+      <select id="extendMonths">
+        <option value="1">1 个月</option>
+        <option value="3" selected>3 个月</option>
+        <option value="6">6 个月</option>
+        <option value="12">12 个月</option>
+        <option value="24">24 个月</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" style="background:#f4f4f5;color:#606266" onclick="hideExtendModal()">取消</button>
+      <button class="btn btn-primary" onclick="extendLicense()">确认延长</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentPage = 1;
+let currentLicenseKey = '';
+
+// 检查登录状态
+function checkAuth() {
+  const token = localStorage.getItem('ls_admin_token');
+  if (!token) { window.location.href = '/admin/login'; return null; }
+  const username = localStorage.getItem('ls_admin_user') || 'admin';
+  document.getElementById('username').textContent = username;
+  return token;
+}
+
+// API 请求封装
+async function api(path, options = {}) {
+  const token = checkAuth();
+  if (!token) return null;
+  const resp = await fetch(path, {
+    ...options,
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...options.headers }
+  });
+  return resp.json();
+}
+
+// 加载授权码列表
+async function loadLicenses() {
+  const keyword = document.getElementById('searchInput').value;
+  let url = '/api/v1/admin/licenses?all=true&page=' + currentPage;
+  if (keyword) url += '&keyword=' + encodeURIComponent(keyword);
+
+  const data = await api(url);
+  if (!data) return;
+  renderTable(data.licenses || []);
+  renderPagination(data.total || 0);
+  updateStats(data);
+}
+
+function renderTable(licenses) {
+  const tbody = document.getElementById('licenseTableBody');
+  if (licenses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#909399;padding:40px;">暂无数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = licenses.map(l => {
+    const statusMap = { active:'有效', expired:'已过期', disabled:'已禁用', revoked:'已撤销' };
+    const statusClass = { active:'tag-active', expired:'tag-expired', disabled:'tag-disabled', revoked:'tag-revoked' };
+    return `<tr>
+      <td><code style="background:#f4f4f5;padding:2px 6px;border-radius:3px;font-size:13px;">${l.license_key}</code></td>
+      <td>${l.username || l.user_id || '-'}</td>
+      <td><span class="tag ${statusClass[l.status]||''}">${statusMap[l.status]||l.status}</span></td>
+      <td>${l.activated_count || 0} / ${l.max_activations || '∞'}</td>
+      <td style="font-size:13px;">${l.valid_from ? l.valid_from.substring(0,10) : '-'} 至<br>${l.valid_to ? l.valid_to.substring(0,10) : '-'}</td>
+      <td>
+        <button class="btn btn-sm btn-warning" onclick="showExtendModal('${l.license_key}')">延期</button>
+        <button class="btn btn-sm btn-danger" onclick="revokeLicense('${l.license_key}')" style="margin-left:6px;">撤销</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateStats(data) {
+  document.getElementById('statTotal').textContent = data.total || 0;
+  document.getElementById('statActive').textContent = data.active_count || 0;
+  document.getElementById('statExpired').textContent = data.expired_count || 0;
+  document.getElementById('statActivations').textContent = data.activation_count || 0;
+}
+
+// 创建授权码
+async function createLicense() {
+  const user = document.getElementById('createUser').value;
+  const duration = parseInt(document.getElementById('createDuration').value);
+  const maxAct = parseInt(document.getElementById('createMaxAct').value);
+
+  const body = { valid_days: duration * 30, max_activations: maxAct };
+  if (user) {
+    if (isNaN(parseInt(user))) body.username = user;
+    else body.user_id = parseInt(user);
+  }
+
+  const result = await api('/api/v1/admin/license', { method: 'POST', body: JSON.stringify(body) });
+  if (result && result.license_key) {
+    showSuccess('授权码创建成功：' + result.license_key);
+    hideCreateModal();
+    loadLicenses();
+  } else {
+    showError((result && result.error) || '创建失败');
+  }
+}
+
+// 撤销授权码
+async function revokeLicense(licenseKey) {
+  if (!confirm('确认撤销授权码 ' + licenseKey + '？')) return;
+  const result = await api('/api/v1/admin/license/' + licenseKey + '/revoke', { method: 'PUT' });
+  if (result && result.message) {
+    showSuccess('授权码已撤销');
+    loadLicenses();
+  } else {
+    showError((result && result.error) || '操作失败');
+  }
+}
+
+// 延期
+function showExtendModal(licenseKey) {
+  currentLicenseKey = licenseKey;
+  document.getElementById('extendModal').classList.add('active');
+}
+function hideExtendModal() {
+  document.getElementById('extendModal').classList.remove('active');
+}
+async function extendLicense() {
+  const months = parseInt(document.getElementById('extendMonths').value);
+  const result = await api('/api/v1/admin/license/' + currentLicenseKey + '/extend', {
+    method: 'PUT',
+    body: JSON.stringify({ extra_days: months * 30 })
+  });
+  if (result && result.message) {
+    showSuccess('授权已延长 ' + months + ' 个月');
+    hideExtendModal();
+    loadLicenses();
+  } else {
+    showError((result && result.error) || '操作失败');
+  }
+}
+
+// 弹窗
+function showCreateModal() { document.getElementById('createModal').classList.add('active'); }
+function hideCreateModal() { document.getElementById('createModal').classList.remove('active'); }
+
+// 提示
+function showSuccess(msg) {
+  const el = document.getElementById('successAlert');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+function showError(msg) {
+  const el = document.getElementById('errorAlert');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+function resetSearch() {
+  document.getElementById('searchInput').value = '';
+  currentPage = 1;
+  loadLicenses();
+}
+
+function logout() {
+  localStorage.removeItem('ls_admin_token');
+  localStorage.removeItem('ls_admin_user');
+  window.location.href = '/admin/login';
+}
+
+// 初始化
+checkAuth();
+loadLicenses();
+</script>
+</body>
+</html>

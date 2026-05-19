@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台登录 - License Server</title>
+<style>
+* { margin:0; padding:0; box-sizing: border-box; }
+body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-box { background: #fff; border-radius: 8px; padding: 40px; width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.2); }
+.login-box h2 { text-align: center; margin-bottom: 8px; color: #303133; font-size: 22px; }
+.login-box .subtitle { text-align: center; font-size: 14px; color: #909399; margin-bottom: 28px; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; font-size: 14px; color: #606266; margin-bottom: 8px; font-weight: 500; }
+.form-group input { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; transition: border-color .2s; }
+.form-group input:focus { outline: none; border-color: #409eff; }
+.btn { width: 100%; padding: 10px 24px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; background: #409eff; color: #fff; transition: background .2s; }
+.btn:hover { background: #66b1ff; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.alert { padding: 10px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 13px; display: none; }
+.alert-error { background: #fef0f0; color: #f56c6c; border: 1px solid #fde2e2; }
+.footer { text-align: center; margin-top: 20px; font-size: 13px; }
+.footer a { color: #409eff; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="login-box">
+  <h2>管理后台</h2>
+  <p class="subtitle">License Server 授权管理系统</p>
+
+  <div class="alert alert-error" id="errorAlert"></div>
+
+  <form id="loginForm">
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" name="username" required placeholder="请输入管理员用户名">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" name="password" required placeholder="请输入密码">
+    </div>
+    <button type="submit" class="btn" id="loginBtn">登 录</button>
+  </form>
+  <div class="footer">
+    <a href="/">&larr; 返回申请页面</a>
+  </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '登录中...';
+
+  const formData = new FormData(this);
+  const data = {};
+  formData.forEach((v, k) => data[k] = v);
+
+  try {
+    const resp = await fetch('/api/v1/admin/web-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const result = await resp.json();
+    if (resp.ok && result.token) {
+      localStorage.setItem('ls_admin_token', result.token);
+      localStorage.setItem('ls_admin_user', result.username || '');
+      window.location.href = '/admin/dashboard';
+    } else {
+      showError(result.error || '登录失败，请检查用户名或密码');
+      btn.disabled = false;
+      btn.textContent = '登 录';
+    }
+  } catch(err) {
+    showError('网络错误，请稍后重试');
+    btn.disabled = false;
+    btn.textContent = '登 录';
+  }
+});
+
+function showError(msg) {
+  const el = document.getElementById('errorAlert');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>
