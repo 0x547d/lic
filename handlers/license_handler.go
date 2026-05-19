@@ -307,3 +307,53 @@ func (h *LicenseHandler) DeactivateDevice(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "device deactivated"})
 }
+
+// DisableLicense 手动禁用授权码（仅 active → disabled）
+func (h *LicenseHandler) DisableLicense(c *gin.Context) {
+	licenseKey := c.Param("licenseKey")
+
+	var license models.License
+	if err := h.DB.Where("license_key = ?", licenseKey).First(&license).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "license not found"})
+		return
+	}
+
+	if license.Status != models.LicenseStatusActive {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "只能禁用有效状态的授权码"})
+		return
+	}
+
+	h.DB.Model(&license).Update("status", models.LicenseStatusDisabled)
+
+	adminID := c.GetUint("user_id")
+	adminName := c.GetString("username")
+	utils.LogOperation(h.DB, adminID, adminName, "disable", licenseKey,
+		"手动禁用授权码", c.ClientIP())
+
+	c.JSON(http.StatusOK, gin.H{"message": "license disabled"})
+}
+
+// EnableLicense 重新启用已禁用的授权码（仅 disabled → active）
+func (h *LicenseHandler) EnableLicense(c *gin.Context) {
+	licenseKey := c.Param("licenseKey")
+
+	var license models.License
+	if err := h.DB.Where("license_key = ?", licenseKey).First(&license).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "license not found"})
+		return
+	}
+
+	if license.Status != models.LicenseStatusDisabled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "只能启用已禁用的授权码"})
+		return
+	}
+
+	h.DB.Model(&license).Update("status", models.LicenseStatusActive)
+
+	adminID := c.GetUint("user_id")
+	adminName := c.GetString("username")
+	utils.LogOperation(h.DB, adminID, adminName, "enable", licenseKey,
+		"重新启用授权码", c.ClientIP())
+
+	c.JSON(http.StatusOK, gin.H{"message": "license enabled"})
+}

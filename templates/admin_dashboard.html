@@ -56,6 +56,11 @@ tr:hover td{background:#f5f7fa}
 .modal .form-group input,.modal .form-group select{padding:8px 12px;border:1px solid #dcdfe6;border-radius:4px;font-size:14px;width:100%}
 .modal .form-group input:focus,.modal .form-group select:focus{outline:none;border-color:#409eff}
 .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px}
+.checkbox-group{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.checkbox-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #dcdfe6;border-radius:4px;cursor:pointer;transition:border-color .2s}
+.checkbox-item:hover{border-color:#409eff}
+.checkbox-item input[type="checkbox"]{width:16px;height:16px;cursor:pointer}
+.checkbox-item span{font-size:14px;color:#606266;cursor:pointer}
 .pagination{display:flex;gap:8px;justify-content:center;margin-top:20px}
 .pagination button{padding:6px 12px;border:1px solid #dcdfe6;background:#fff;border-radius:4px;cursor:pointer;font-size:13px}
 .pagination button.active{background:#409eff;color:#fff;border-color:#409eff}
@@ -197,10 +202,10 @@ tr:hover td{background:#f5f7fa}
       <input type="text" id="createUser" placeholder="输入用户ID 或 用户名">
     </div>
     <div class="form-group">
-      <label>产品类型 *</label>
-      <select id="createProductKey">
-        <option value="">加载中...</option>
-      </select>
+      <label>产品类型 *（可多选）</label>
+      <div class="checkbox-group" id="createProductKeyCheckboxes">
+        <span style="color:#909399;font-size:13px;">加载中...</span>
+      </div>
     </div>
     <div class="form-group">
       <label>授权时长 *</label>
@@ -319,14 +324,15 @@ function renderTable(licenses) {
       <td><code style="background:#f4f4f5;padding:2px 6px;border-radius:3px;font-size:13px;">${l.license_key}</code></td>
       <td>${l.username || l.user_id || '-'}</td>
       <td><span class="tag ${statusClass[l.status]||''}">${statusMap[l.status]||l.status}</span></td>
-      <td>${productMap[l.product_key] || l.product_key || '-'}</td>
+      <td>${(l.product_keys && l.product_keys.length) ? l.product_keys.map(k => productMap[k] || k).join(', ') : (l.product_key ? (productMap[l.product_key] || l.product_key) : '-')}</td>
       <td>${permanentBadge}</td>
       <td>${l.activated_count || 0} / ${l.max_activations || '∞'}</td>
       <td style="font-size:13px;">${l.valid_from ? l.valid_from.substring(0,10) : '-'}<br>${l.valid_to ? l.valid_to.substring(0,10) : '-'}</td>
       <td>${notifyHtml}</td>
       <td>
-        <button class="btn btn-sm btn-warning" onclick="showExtendModal('${l.license_key}')">延期</button>
-        <button class="btn btn-sm btn-danger" onclick="revokeLicense('${l.license_key}')" style="margin-left:6px;">撤销</button>
+        ${l.status === 'active' ? '<button class="btn btn-sm btn-warning" onclick="showExtendModal(\'' + l.license_key + '\')">延期</button><button class="btn btn-sm" style="background:#909399;color:#fff;margin-left:6px;" onclick="disableLicense(\'' + l.license_key + '\')">禁用</button><button class="btn btn-sm btn-danger" onclick="revokeLicense(\'' + l.license_key + '\')" style="margin-left:6px;">撤销</button>' : ''}
+        ${l.status === 'disabled' ? '<button class="btn btn-sm btn-success" onclick="enableLicense(\'' + l.license_key + '\')">启用</button><button class="btn btn-sm btn-danger" onclick="revokeLicense(\'' + l.license_key + '\')" style="margin-left:6px;">撤销</button>' : ''}
+        ${l.status === 'expired' || l.status === 'revoked' ? '<button class="btn btn-sm btn-danger" onclick="revokeLicense(\'' + l.license_key + '\')">撤销</button>' : ''}
       </td>
     </tr>`;
   }).join('');
@@ -346,8 +352,10 @@ async function loadProducts() {
   productList = data.products;
   productMap = {};
   productList.forEach(p => productMap[p.product_key] = p.name);
-  const sel = document.getElementById('createProductKey');
-  sel.innerHTML = productList.map(p => '<option value="'+p.product_key+'">'+p.name+'</option>').join('');
+  const container = document.getElementById('createProductKeyCheckboxes');
+  container.innerHTML = productList.map(p =>
+    '<label class="checkbox-item"><input type="checkbox" name="product_keys" value="'+p.product_key+'"> <span>'+p.name+'</span></label>'
+  ).join('');
 }
 
 // 创建授权码
@@ -357,11 +365,11 @@ async function createLicense() {
   const maxAct = parseInt(document.getElementById('createMaxAct').value);
 
   const body = { max_activations: maxAct };
-  const productKey = document.getElementById('createProductKey').value;
-  if (!productKey) { showError('请选择产品类型'); return; }
-  body.product_key = productKey;
+  const checked = document.querySelectorAll('input[name="product_keys"]:checked');
+  if (checked.length === 0) { showError('请至少选择一个产品类型'); hideCreateModal(); return; }
+  body.product_keys = Array.from(checked).map(cb => cb.value);
   if (duration === 0) {
-    body.valid_months = 0;  // 永久
+    body.valid_months = 0;
   } else {
     body.valid_months = duration;
   }
@@ -386,6 +394,30 @@ async function revokeLicense(licenseKey) {
   const result = await api('/api/v1/admin/license/' + licenseKey + '/revoke', { method: 'PUT' });
   if (result && result.message) {
     showSuccess('授权码已撤销');
+    loadLicenses();
+  } else {
+    showError((result && result.error) || '操作失败');
+  }
+}
+
+// 禁用授权码
+async function disableLicense(licenseKey) {
+  if (!confirm('确认禁用授权码 ' + licenseKey + '？禁用后该授权码将暂时失效，可重新启用。')) return;
+  const result = await api('/api/v1/admin/license/' + licenseKey + '/disable', { method: 'PUT' });
+  if (result && result.message) {
+    showSuccess('授权码已禁用');
+    loadLicenses();
+  } else {
+    showError((result && result.error) || '操作失败');
+  }
+}
+
+// 启用授权码
+async function enableLicense(licenseKey) {
+  if (!confirm('确认启用授权码 ' + licenseKey + '？')) return;
+  const result = await api('/api/v1/admin/license/' + licenseKey + '/enable', { method: 'PUT' });
+  if (result && result.message) {
+    showSuccess('授权码已启用');
     loadLicenses();
   } else {
     showError((result && result.error) || '操作失败');

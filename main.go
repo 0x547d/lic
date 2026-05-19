@@ -112,6 +112,8 @@ func main() {
 		admin.PUT("/license/:licenseKey/extend", licenseHandler.ExtendLicense)
 		admin.GET("/license/:licenseKey/activations", licenseHandler.ListActivations)
 		admin.PUT("/license/:licenseKey/deactivate/:deviceFP", licenseHandler.DeactivateDevice)
+		admin.PUT("/license/:licenseKey/disable", licenseHandler.DisableLicense)
+		admin.PUT("/license/:licenseKey/enable", licenseHandler.EnableLicense)
 		admin.GET("/logs", webHandler.ListOperationLogs)
 		// 产品管理
 		admin.GET("/products", productHandler.ListProducts)
