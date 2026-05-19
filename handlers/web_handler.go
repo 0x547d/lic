@@ -79,13 +79,13 @@ func (h *WebHandler) WebLogin(c *gin.Context) {
 
 // HandleApply 客户提交授权申请
 type ApplyRequest struct {
-	ApplicantName  string `json:"applicant_name" binding:"required"`
-	Email          string `json:"email" binding:"required,email"`
-	Phone          string `json:"phone"`
-	ProductType    string `json:"product_type" binding:"required"`
-	DurationMonths int    `json:"duration_months" binding:"required,min=1"`
-	MaxActivations int    `json:"max_activations" binding:"required,min=1"`
-	Description    string `json:"description"`
+	ApplicantName  string   `json:"applicant_name" binding:"required"`
+	Email          string   `json:"email" binding:"required,email"`
+	Phone          string   `json:"phone"`
+	ProductKeys    []string `json:"product_keys" binding:"required,min=1"`
+	DurationMonths int      `json:"duration_months" binding:"required,min=1"`
+	MaxActivations int      `json:"max_activations" binding:"required,min=1"`
+	Description    string   `json:"description"`
 }
 
 func (h *WebHandler) HandleApply(c *gin.Context) {
@@ -98,7 +98,7 @@ func (h *WebHandler) HandleApply(c *gin.Context) {
 		ApplicantName:  req.ApplicantName,
 		Email:          req.Email,
 		Phone:          req.Phone,
-		ProductType:    req.ProductType,
+		ProductKeys:    models.JSONSlice(req.ProductKeys),
 		DurationMonths: req.DurationMonths,
 		MaxActivations: req.MaxActivations,
 		Description:    req.Description,
@@ -144,6 +144,9 @@ func (h *WebHandler) ApproveApplication(c *gin.Context) {
 		return
 	}
 
+	var req ReviewRequest
+	_ = c.ShouldBindJSON(&req)
+
 	// 创建用户
 	hash, _ := utils.HashPassword(uuid.New().String()[:12])
 	user := models.User{
@@ -157,6 +160,7 @@ func (h *WebHandler) ApproveApplication(c *gin.Context) {
 	validTo := time.Now().Add(time.Duration(record.DurationMonths) * 30 * 24 * time.Hour)
 	license := models.License{
 		UserID:         user.ID,
+		ProductKeys:    record.ProductKeys,
 		Status:         models.LicenseStatusActive,
 		MaxActivations: record.MaxActivations,
 		ActivatedCount: 0,
@@ -170,7 +174,7 @@ func (h *WebHandler) ApproveApplication(c *gin.Context) {
 	h.DB.Model(&record).Updates(map[string]interface{}{
 		"status":      "approved",
 		"license_key": license.LicenseKey,
-		"admin_note":  c.PostForm("admin_note"),
+		"admin_note":  req.AdminNote,
 	})
 
 	// 发邮件通知申请人
@@ -202,7 +206,9 @@ func (h *WebHandler) RejectApplication(c *gin.Context) {
 		return
 	}
 
-	adminNote := c.PostForm("admin_note")
+	var req ReviewRequest
+	_ = c.ShouldBindJSON(&req)
+	adminNote := req.AdminNote
 	h.DB.Model(&record).Updates(map[string]interface{}{
 		"status":     "rejected",
 		"admin_note": adminNote,

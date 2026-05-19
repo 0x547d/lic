@@ -23,11 +23,12 @@ func NewLicenseHandler(db *gorm.DB) *LicenseHandler {
 
 // CreateLicenseRequest 创建授权码请求
 type CreateLicenseRequest struct {
-	UserID         uint   `json:"user_id"`
-	Username       string `json:"username"` // 可选，用用户名查找
-	MaxActivations int    `json:"max_activations" binding:"required,min=1"`
-	ValidMonths    int    `json:"valid_months"` // 按月（优先），0 或负数表示永久
-	ValidDays      int    `json:"valid_days"`   // 按天（兼容旧版）
+	UserID         uint     `json:"user_id"`
+	Username       string   `json:"username"` // 可选，用用户名查找
+	ProductKeys    []string `json:"product_keys" binding:"required,min=1"`
+	MaxActivations int      `json:"max_activations" binding:"required,min=1"`
+	ValidMonths    int      `json:"valid_months"` // 按月（优先），0 或负数表示永久
+	ValidDays      int      `json:"valid_days"`   // 按天（兼容旧版）
 }
 
 // CreateLicense 创建新授权码（管理员功能）
@@ -63,6 +64,7 @@ func (h *LicenseHandler) CreateLicense(c *gin.Context) {
 	now := time.Now()
 	license := models.License{
 		UserID:         user.ID,
+		ProductKeys:    req.ProductKeys,
 		LicenseKey:     uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8] + "-" + uuid.New().String()[0:8],
 		Status:         models.LicenseStatusActive,
 		MaxActivations: req.MaxActivations,

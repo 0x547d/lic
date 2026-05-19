@@ -41,22 +41,23 @@ type User struct {
 
 // License 授权码表
 type License struct {
-	ID              uint          `gorm:"primaryKey" json:"id"`
-	UserID          uint          `gorm:"index;not null" json:"user_id"`
-	LicenseKey      string        `gorm:"uniqueIndex;size:64;not null" json:"license_key"` // 授权码字符串
-	Status          LicenseStatus `gorm:"size:20;not null;default:active" json:"status"`
-	MaxActivations  int           `gorm:"default:1" json:"max_activations"`      // 最大激活数
-	ActivatedCount  int           `gorm:"default:0" json:"activated_count"`      // 已激活数
-	ValidFrom       time.Time     `json:"valid_from"`                            // 有效期开始
-	ValidTo         time.Time     `json:"valid_to"`                              // 有效期结束
-	Notified7Days   bool          `gorm:"default:false" json:"notified_7days"`   // 已发送7天到期提醒
-	Notified1Day    bool          `gorm:"default:false" json:"notified_1day"`    // 已发送1天到期提醒
-	NotifiedExpired bool          `gorm:"default:false" json:"notified_expired"` // 已发送已过期通知
-	IsPermanent     bool          `gorm:"default:false" json:"is_permanent"`     // 永久有效
-	HardwareIDs     JSONSlice     `gorm:"type:text" json:"hardware_ids"`         // 绑定的硬件ID列表
-	CreatedAt       time.Time     `json:"created_at"`
-	UpdatedAt       time.Time     `json:"updated_at"`
-	Activations     []Activation  `gorm:"foreignKey:LicenseID" json:"-"`
+	ID              uint             `gorm:"primaryKey" json:"id"`
+	UserID          uint             `gorm:"index;not null" json:"user_id"`
+	ProductKeys     models.JSONSlice `gorm:"type:text;index" json:"product_keys"`             // 关联产品标识（多选）
+	LicenseKey      string           `gorm:"uniqueIndex;size:64;not null" json:"license_key"` // 授权码字符串
+	Status          LicenseStatus    `gorm:"size:20;not null;default:active" json:"status"`
+	MaxActivations  int              `gorm:"default:1" json:"max_activations"`      // 最大激活数
+	ActivatedCount  int              `gorm:"default:0" json:"activated_count"`      // 已激活数
+	ValidFrom       time.Time        `json:"valid_from"`                            // 有效期开始
+	ValidTo         time.Time        `json:"valid_to"`                              // 有效期结束
+	Notified7Days   bool             `gorm:"default:false" json:"notified_7days"`   // 已发送7天到期提醒
+	Notified1Day    bool             `gorm:"default:false" json:"notified_1day"`    // 已发送1天到期提醒
+	NotifiedExpired bool             `gorm:"default:false" json:"notified_expired"` // 已发送已过期通知
+	IsPermanent     bool             `gorm:"default:false" json:"is_permanent"`     // 永久有效
+	HardwareIDs     JSONSlice        `gorm:"type:text" json:"hardware_ids"`         // 绑定的硬件ID列表
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+	Activations     []Activation     `gorm:"foreignKey:LicenseID" json:"-"`
 }
 
 // Activation 激活记录表
@@ -168,19 +169,19 @@ func generateLicenseKey() string {
 
 // ApplyRecord 客户自助授权申请记录
 type ApplyRecord struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	ApplicantName  string    `gorm:"size:128;not null" json:"applicant_name"`
-	Email          string    `gorm:"size:128;not null;index" json:"email"`
-	Phone          string    `gorm:"size:32" json:"phone"`
-	ProductType    string    `gorm:"size:32" json:"product_type"`
-	DurationMonths int       `json:"duration_months"`
-	MaxActivations int       `json:"max_activations"`
-	Description    string    `gorm:"type:text" json:"description"`
-	Status         string    `gorm:"size:20;default:pending" json:"status"` // pending/approved/rejected
-	AdminNote      string    `gorm:"type:text" json:"admin_note"`
-	LicenseKey     string    `gorm:"size:64" json:"license_key"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uint             `gorm:"primaryKey" json:"id"`
+	ApplicantName  string           `gorm:"size:128;not null" json:"applicant_name"`
+	Email          string           `gorm:"size:128;not null;index" json:"email"`
+	Phone          string           `gorm:"size:32" json:"phone"`
+	ProductKeys    models.JSONSlice `gorm:"type:text" json:"product_keys"` // 关联产品标识（多选）
+	DurationMonths int              `json:"duration_months"`
+	MaxActivations int              `json:"max_activations"`
+	Description    string           `gorm:"type:text" json:"description"`
+	Status         string           `gorm:"size:20;default:pending" json:"status"` // pending/approved/rejected
+	AdminNote      string           `gorm:"type:text" json:"admin_note"`
+	LicenseKey     string           `gorm:"size:64" json:"license_key"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
 }
 
 // OperationLog 管理员操作日志

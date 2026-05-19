@@ -104,7 +104,7 @@ func BuildApplyNotifyAdmin(record *models.ApplyRecord) (string, string) {
 		<hr><p>请登录管理后台处理此申请。</p>
 		</body></html>`,
 		record.ApplicantName, record.Email, record.Phone,
-		record.ProductType, record.DurationMonths, record.MaxActivations,
+		strings.Join(record.ProductKeys, ", "), record.DurationMonths, record.MaxActivations,
 		record.Description, record.CreatedAt.Format("2006-01-02 15:04:05"),
 	)
 	return subject, body

@@ -1,16 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/0x547d/lic/config"
 	"github.com/0x547d/lic/handlers"
 	"github.com/0x547d/lic/middleware"
+	"github.com/0x547d/lic/models"
 	"github.com/0x547d/lic/utils"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -18,6 +19,12 @@ func main() {
 
 	// 初始化数据库
 	db := config.InitDB(cfg)
+
+	// Seed 默认产品（如不存在则创建）
+	seedDefaultProducts(db)
+
+	// 迁移旧 product_key 数据到 product_keys
+	migrateProductKeys(db)
 
 	// 启动定时任务（每天上午10:00检查授权到期）
 	utils.StartScheduler(db, cfg)
@@ -30,6 +37,7 @@ func main() {
 
 	// 设置 gin 模式
 	gin.SetMode(gin.ReleaseMode)
+	gin.DisableConsoleColor()
 	r := gin.Default()
 
 	// 加载 HTML 模板
@@ -53,6 +61,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db)
 	licenseHandler := handlers.NewLicenseHandler(db)
 	webHandler := handlers.NewWebHandler(db, cfg)
+	productHandler := handlers.NewProductHandler(db)
 
 	// ===== Web 页面路由 =====
 	r.GET("/", webHandler.ApplyPage)                         // 客户自助申请页面
@@ -69,8 +78,9 @@ func main() {
 		public.POST("/offline/request/gen", authHandler.OfflineRequestGen)
 		public.GET("/offline/request/:token/download", authHandler.OfflineRequestDownload)
 		public.POST("/offline/activate/:token", authHandler.OfflineActivate)
-		public.POST("/apply", webHandler.HandleApply)        // 客户提交授权申请
-		public.POST("/admin/web-login", webHandler.WebLogin) // 管理后台登录（返回 Token）
+		public.POST("/apply", webHandler.HandleApply)              // 客户提交授权申请
+		public.GET("/products", productHandler.ListProductsPublic) // 公开产品列表
+		public.POST("/admin/web-login", webHandler.WebLogin)       // 管理后台登录（返回 Token）
 	}
 
 	// ===== 需要 JWT 认证的 API =====
@@ -87,8 +97,13 @@ func main() {
 	admin.Use(middleware.JWTAuth())
 	{
 		admin.GET("/check-expiring", func(c *gin.Context) {
-			utils.RunCheckNow(db, cfg)
-			c.JSON(http.StatusOK, gin.H{"message": "expiration check triggered"})
+			result := utils.RunCheckNow(db, cfg)
+			c.JSON(http.StatusOK, gin.H{
+				"message":       "expiration check completed",
+				"checked_count": result.CheckedCount,
+				"emails_sent":   result.EmailsSent,
+				"failures":      result.Failures,
+			})
 		})
 		admin.POST("/license", licenseHandler.CreateLicense)
 		admin.GET("/licenses", licenseHandler.ListLicenses)
@@ -98,6 +113,11 @@ func main() {
 		admin.GET("/license/:licenseKey/activations", licenseHandler.ListActivations)
 		admin.PUT("/license/:licenseKey/deactivate/:deviceFP", licenseHandler.DeactivateDevice)
 		admin.GET("/logs", webHandler.ListOperationLogs)
+		// 产品管理
+		admin.GET("/products", productHandler.ListProducts)
+		admin.POST("/products", productHandler.CreateProduct)
+		admin.PUT("/products/:productKey", productHandler.UpdateProduct)
+		admin.DELETE("/products/:productKey", productHandler.DeleteProduct)
 	}
 
 	// 健康检查
@@ -107,11 +127,55 @@ func main() {
 
 	// 启动服务
 	addr := cfg.HTTPAddr
-	fmt.Printf("🚀 License Server starting on %s\n", addr)
-	fmt.Printf("   Web:       http://localhost%s/\n", addr)
-	fmt.Printf("   Admin:     http://localhost%s/admin/login\n", addr)
-	fmt.Printf("   API Login: POST http://localhost%s/api/v1/login\n", addr)
+	log.Printf("🚀 License Server starting on %s", addr)
+	log.Printf("   Web:       http://localhost%s/\n", addr)
+	log.Printf("   Admin:     http://localhost%s/admin/login\n", addr)
+	log.Printf("   API Login: POST http://localhost%s/api/v1/login\n", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("failed to start server: %v", err)
 	}
+}
+
+// seedDefaultProducts 初始化默认产品数据
+func seedDefaultProducts(db *gorm.DB) {
+	defaults := []models.Product{
+		{ProductKey: "standard", Name: "标准版", Description: "基础功能版本"},
+		{ProductKey: "pro", Name: "专业版", Description: "专业功能版本"},
+		{ProductKey: "enterprise", Name: "企业版", Description: "企业级功能版本"},
+		{ProductKey: "trial", Name: "试用版", Description: "免费试用版本"},
+	}
+	for _, p := range defaults {
+		var existing models.Product
+		if err := db.Where("product_key = ?", p.ProductKey).First(&existing).Error; err != nil {
+			db.Create(&p)
+		}
+	}
+}
+
+// migrateProductKeys 将旧 product_key 列数据迁移到 product_keys（仅在有旧列时执行）
+func migrateProductKeys(db *gorm.DB) {
+	migrate := func(table string) {
+		rows, err := db.Raw("SELECT id, product_key FROM "+table+" WHERE product_keys IS NULL OR product_keys = ?", "").Rows()
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+		type rec struct {
+			ID  uint
+			Key string
+		}
+		var batch []rec
+		for rows.Next() {
+			var r rec
+			rows.Scan(&r.ID, &r.Key)
+			if r.Key != "" {
+				batch = append(batch, r)
+			}
+		}
+		for _, r := range batch {
+			db.Table(table).Where("id = ?", r.ID).Update("product_keys", models.JSONSlice{r.Key})
+		}
+	}
+	migrate("licenses")
+	migrate("apply_records")
 }

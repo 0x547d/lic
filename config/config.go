@@ -92,6 +92,7 @@ func InitDB(cfg *Config) *gorm.DB {
 		&models.OfflineRequest{},
 		&models.ApplyRecord{},
 		&models.OperationLog{},
+		&models.Product{},
 	)
 	if err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
