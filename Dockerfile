@@ -1,5 +1,5 @@
 # ---------- 构建阶段 ----------
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -29,6 +29,9 @@ COPY templates/  ./templates/
 COPY static/     ./static/
 COPY rsa_private.pem ./rsa_private.pem
 COPY rsa_public.pem  ./rsa_public.pem
+
+# 设置时区为中国大陆时间
+ENV TZ=Asia/Shanghai
 
 # 暴露端口（与 main.go 中 gin 监听端口一致）
 EXPOSE 8080
