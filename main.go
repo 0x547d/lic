@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -30,8 +31,21 @@ func main() {
 	utils.StartScheduler(db, cfg)
 
 	// 初始化 RSA 密钥（用于离线激活签名）
-	if err := utils.InitRSA("", ""); err != nil {
-		log.Fatalf("failed to init RSA: %v", err)
+	// 优先级：环境变量 > 默认路径 > 自动生成临时密钥
+	rsaPrivateKeyPath := os.Getenv("RSA_PRIVATE_KEY_PATH")
+	rsaPublicKeyPath := os.Getenv("RSA_PUBLIC_KEY_PATH")
+
+	// 如果环境变量未设置，使用配置中的路径
+	if rsaPrivateKeyPath == "" {
+		rsaPrivateKeyPath = cfg.RSAPrivateKeyPath
+	}
+	if rsaPublicKeyPath == "" {
+		rsaPublicKeyPath = cfg.RSAPublicKeyPath
+	}
+
+	if err := utils.InitRSA(rsaPrivateKeyPath, rsaPublicKeyPath); err != nil {
+		log.Printf("Warning: failed to load RSA from file, using temporary key: %v", err)
+		// 注意：如果加载文件失败，会继续使用自动生成的临时密钥
 	}
 	utils.JWTSecret = []byte(cfg.JWTSecret)
 
@@ -90,6 +104,7 @@ func main() {
 		protected.POST("/activate", authHandler.ActivateOnline)
 		protected.GET("/license/me", licenseHandler.GetLicense)
 		protected.GET("/licenses", licenseHandler.ListLicenses)
+		protected.GET("/license/:licenseKey/offline-auth-file", authHandler.DownloadOfflineAuthFile)
 	}
 
 	// ===== 管理员 API（带 JWT 鉴权）=====

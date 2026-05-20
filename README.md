@@ -149,6 +149,100 @@ curl -X POST http://localhost:8080/api/v1/register \
      └─> 验证签名 + 有效期 ─> 激活成功
 ```
 
+## 离线授权验证（客户端离线使用）
+
+适用于客户端无法连接外网，但仍需验证授权有效性的场景。
+
+### 原理
+
+1. 客户端联网时，下载**离线授权文件**（包含授权信息 + RSA签名）
+2. 客户端将文件保存到本地
+3. 离线时，客户端验证本地授权文件：
+   - 验证 RSA 签名（使用服务端公钥）
+   - 检查授权有效期（`valid_from` / `valid_to`）
+4. **无需定期联网**，文件在授权有效期内始终有效
+
+### 使用流程
+
+```
+[客户端联网时]
+  1. GET /api/v1/license/:licenseKey/offline-auth-file
+     └─> 下载 offline-auth-<licenseKey>.json
+  2. 保存文件到本地
+
+[客户端离线时]
+  3. 读取本地 offline-auth-<licenseKey>.json
+  4. 验证文件签名和有效期
+     └─> 验证通过 → 授权有效
+     └─> 验证失败 → 授权无效，提示用户联网
+```
+
+### API 接口
+
+#### 下载离线授权文件（需要 JWT 认证）
+
+```
+GET /api/v1/license/:licenseKey/offline-auth-file
+Header: Authorization: Bearer <token>
+```
+
+**响应**：返回 JSON 格式的离线授权文件，浏览器自动下载。
+
+**文件内容示例**：
+```json
+{
+  "version": "1.0",
+  "license_key": "A1B2-C3D4-E5F6-7890",
+  "company": "ABC科技有限公司",
+  "product_keys": ["standard", "pro"],
+  "valid_from": "2026-01-01T00:00:00Z",
+  "valid_to": "2027-01-01T00:00:00Z",
+  "activated_count": 2,
+  "max_activations": 5,
+  "issued_at": "2026-01-01T00:00:00Z",
+  "signature": "a1b2c3d4e5f6...",
+  "certificate": "-----BEGIN PUBLIC KEY-----\n..."
+}
+```
+
+### 客户端验证步骤
+
+1. **验证签名**：
+   - 使用服务端公钥（`certificate` 字段）验证 `signature` 字段
+   - 签名数据：`version|license_key|company|valid_from|valid_to|activated_count|max_activations`
+
+2. **验证授权有效期**：
+   - 检查当前时间是否在 `valid_from` 和 `valid_to` 之间
+
+### 客户端示例代码
+
+参见 `cmd/client_example/main.go`：
+
+```bash
+# 1. 下载离线授权文件（需要 JWT Token）
+go run cmd/client_example/main.go download <token> <license_key>
+
+# 2. 验证离线授权文件（无需联网）
+go run cmd/client_example/main.go verify <license_key>
+```
+
+### 生产环境部署建议
+
+1. **服务端**：
+   - 生成 RSA 密钥对（`rsa_private.pem` / `rsa_public.pem`）
+   - 私钥用于签名离线授权文件
+   - 公钥分发给所有客户端（嵌入客户端程序）
+
+2. **客户端**：
+   - 定期（如每24小时）尝试联网下载最新离线授权文件
+   - 离线时，使用本地文件验证授权
+   - 超过宽限期（如7天）后，强制要求联网
+
+3. **安全建议**：
+   - 公钥可以公开，但确保客户端使用的是正确的公钥
+   - 建议将公钥硬编码到客户端程序中
+   - 定期检查授权文件是否被篡改
+
 ## 数据库表结构
 
 - **users**：用户账号（用户名、密码哈希、邮箱）

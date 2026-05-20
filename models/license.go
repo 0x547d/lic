@@ -156,6 +156,21 @@ type OfflineActivationResponse struct {
 	Certificate       string    `json:"certificate"`        // 服务端公钥证书（PEM格式）
 }
 
+// OfflineAuthFile 离线授权验证文件（客户端离线时使用）
+type OfflineAuthFile struct {
+	Version        string    `json:"version"`         // 协议版本
+	LicenseKey     string    `json:"license_key"`     // 授权码
+	Company        string    `json:"company"`         // 公司/个人名称
+	ProductKeys    []string  `json:"product_keys"`    // 授权产品列表
+	ValidFrom      time.Time `json:"valid_from"`      // 授权有效期开始
+	ValidTo        time.Time `json:"valid_to"`        // 授权有效期结束
+	ActivatedCount int       `json:"activated_count"` // 已激活设备数
+	MaxActivations int       `json:"max_activations"` // 最大激活数
+	IssuedAt       time.Time `json:"issued_at"`       // 文件签发时间
+	Signature      string    `json:"signature"`       // 服务端 RSA 签名
+	Certificate    string    `json:"certificate"`     // 服务端公钥证书（PEM格式）
+}
+
 // 生成授权码（格式：XXXX-XXXX-XXXX-XXXX）
 func generateLicenseKey() string {
 	import_uuid := uuid.New().String()

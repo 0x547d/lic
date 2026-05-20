@@ -16,36 +16,40 @@ import (
 )
 
 type Config struct {
-	DBType     string // mysql 或 sqlite
-	DBDSN      string // 数据库连接字符串
-	HTTPAddr   string // HTTP 监听地址
-	JWTSecret  string
-	JWTExpire  time.Duration
-	AdminUser  string // 管理员用户名（用于前端登录）
-	AdminPass  string // 管理员密码（bcrypt 哈希）
-	SMTPHost   string // SMTP 服务器地址
-	SMTPPort   int    // SMTP 端口
-	SMTPUser   string // SMTP 用户名
-	SMTPPass   string // SMTP 密码
-	SMTPFrom   string // 发件人地址
-	AdminEmail string // 管理员收件邮箱（申请通知等）
+	DBType            string // mysql 或 sqlite
+	DBDSN             string // 数据库连接字符串
+	HTTPAddr          string // HTTP 监听地址
+	JWTSecret         string
+	JWTExpire         time.Duration
+	AdminUser         string // 管理员用户名（用于前端登录）
+	AdminPass         string // 管理员密码（bcrypt 哈希）
+	SMTPHost          string // SMTP 服务器地址
+	SMTPPort          int    // SMTP 端口
+	SMTPUser          string // SMTP 用户名
+	SMTPPass          string // SMTP 密码
+	SMTPFrom          string // 发件人地址
+	AdminEmail        string // 管理员收件邮箱（申请通知等）
+	RSAPrivateKeyPath string // RSA 私钥文件路径（用于离线激活签名）
+	RSAPublicKeyPath  string // RSA 公钥文件路径（用于分发到客户端）
 }
 
 func Load() *Config {
 	cfg := &Config{
-		DBType:     getEnv("DB_TYPE", "mysql"),
-		DBDSN:      getEnv("DB_DSN", "root:password@tcp(127.0.0.1:3306)/license?charset=utf8mb4&parseTime=True&loc=Local"),
-		HTTPAddr:   getEnv("HTTP_ADDR", ":8080"),
-		JWTSecret:  getEnv("JWT_SECRET", "change-me-in-production"),
-		JWTExpire:  24 * time.Hour,
-		AdminUser:  getEnv("ADMIN_USER", "admin"),
-		AdminPass:  getEnv("ADMIN_PASS_HASH", ""), // 通过环境变量设置 bcrypt 哈希
-		SMTPHost:   getEnv("SMTP_HOST", ""),
-		SMTPPort:   getEnvAsInt("SMTP_PORT", 587),
-		SMTPUser:   getEnv("SMTP_USER", ""),
-		SMTPPass:   getEnv("SMTP_PASS", ""),
-		SMTPFrom:   getEnv("SMTP_FROM", ""),
-		AdminEmail: getEnv("ADMIN_EMAIL", ""),
+		DBType:            getEnv("DB_TYPE", "mysql"),
+		DBDSN:             getEnv("DB_DSN", "root:password@tcp(127.0.0.1:3306)/license?charset=utf8mb4&parseTime=True&loc=Local"),
+		HTTPAddr:          getEnv("HTTP_ADDR", ":8080"),
+		JWTSecret:         getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTExpire:         24 * time.Hour,
+		AdminUser:         getEnv("ADMIN_USER", "admin"),
+		AdminPass:         getEnv("ADMIN_PASS_HASH", ""), // 通过环境变量设置 bcrypt 哈希
+		SMTPHost:          getEnv("SMTP_HOST", ""),
+		SMTPPort:          getEnvAsInt("SMTP_PORT", 587),
+		SMTPUser:          getEnv("SMTP_USER", ""),
+		SMTPPass:          getEnv("SMTP_PASS", ""),
+		SMTPFrom:          getEnv("SMTP_FROM", ""),
+		AdminEmail:        getEnv("ADMIN_EMAIL", ""),
+		RSAPrivateKeyPath: getEnv("RSA_PRIVATE_KEY_PATH", "rsa_private.pem"), // 默认当前目录
+		RSAPublicKeyPath:  getEnv("RSA_PUBLIC_KEY_PATH", "rsa_public.pem"),   // 默认当前目录
 	}
 	return cfg
 }

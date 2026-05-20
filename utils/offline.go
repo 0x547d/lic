@@ -172,3 +172,108 @@ func EncodeRequestFile(req *models.OfflineActivationRequest) ([]byte, error) {
 func EncodeResponseFile(resp *models.OfflineActivationResponse) ([]byte, error) {
 	return json.MarshalIndent(resp, "", "  ")
 }
+
+// BuildOfflineAuthFile 生成离线授权验证文件
+func BuildOfflineAuthFile(license *models.License, user *models.User) (*models.OfflineAuthFile, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("server private key not initialized")
+	}
+
+	authFile := &models.OfflineAuthFile{
+		Version:        "1.0",
+		LicenseKey:     license.LicenseKey,
+		Company:        user.Username, // username 即公司/个人名称
+		ProductKeys:    []string(license.ProductKeys),
+		ValidFrom:      license.ValidFrom,
+		ValidTo:        license.ValidTo,
+		ActivatedCount: license.ActivatedCount,
+		MaxActivations: license.MaxActivations,
+		IssuedAt:       time.Now(),
+		Certificate:    GetPublicKeyPEM(),
+	}
+
+	// 使用 RSA 私钥签名
+	sig, err := signOfflineAuthFile(authFile, privateKey)
+	if err != nil {
+		return nil, err
+	}
+	authFile.Signature = sig
+
+	return authFile, nil
+}
+
+// VerifyOfflineAuthFile 客户端验证离线授权文件
+func VerifyOfflineAuthFile(authFile *models.OfflineAuthFile, serverPublicKeyPEM string) (bool, string, error) {
+	// 1. 验证时间有效性（授权有效期）
+	now := time.Now()
+	if now.Before(authFile.ValidFrom) {
+		return false, "license not yet valid", nil
+	}
+	if now.After(authFile.ValidTo) {
+		return false, "license expired", nil
+	}
+
+	// 2. 验证签名
+	pubKey, err := parsePublicKey(serverPublicKeyPEM)
+	if err != nil {
+		return false, fmt.Sprintf("invalid server public key: %v", err), err
+	}
+
+	valid, err := verifyOfflineAuthFileSignature(authFile, pubKey)
+	if err != nil {
+		return false, fmt.Sprintf("signature verification failed: %v", err), err
+	}
+	if !valid {
+		return false, "invalid signature", nil
+	}
+
+	return true, "", nil
+}
+
+// GetOfflineAuthFileSignData 获取离线授权文件签名数据
+func GetOfflineAuthFileSignData(authFile *models.OfflineAuthFile) string {
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%d|%d",
+		authFile.Version,
+		authFile.LicenseKey,
+		authFile.Company,
+		authFile.ValidFrom.Format(time.RFC3339),
+		authFile.ValidTo.Format(time.RFC3339),
+		authFile.ActivatedCount,
+		authFile.MaxActivations,
+	)
+}
+
+// signOfflineAuthFile 签名离线授权文件
+func signOfflineAuthFile(authFile *models.OfflineAuthFile, key *rsa.PrivateKey) (string, error) {
+	data := GetOfflineAuthFileSignData(authFile)
+	hash := sha256.Sum256([]byte(data))
+	signature, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, hash[:])
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(signature), nil
+}
+
+// verifyOfflineAuthFileSignature 验证离线授权文件签名
+func verifyOfflineAuthFileSignature(authFile *models.OfflineAuthFile, pubKey *rsa.PublicKey) (bool, error) {
+	data := GetOfflineAuthFileSignData(authFile)
+	hash := sha256.Sum256([]byte(data))
+	sig, err := hex.DecodeString(authFile.Signature)
+	if err != nil {
+		return false, fmt.Errorf("invalid signature encoding: %w", err)
+	}
+	err = rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, hash[:], sig)
+	return err == nil, err
+}
+
+// EncodeOfflineAuthFile 将离线授权文件编码为 JSON
+func EncodeOfflineAuthFile(authFile *models.OfflineAuthFile) ([]byte, error) {
+	return json.MarshalIndent(authFile, "", "  ")
+}
+
+// DecodeOfflineAuthFile 解析离线授权文件
+func DecodeOfflineAuthFile(jsonData []byte) (*models.OfflineAuthFile, error) {
+	var authFile models.OfflineAuthFile
+	err := json.Unmarshal(jsonData, &authFile)
+	return &authFile, err
+}

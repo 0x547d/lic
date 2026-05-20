@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -461,4 +462,42 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		"user_id":     user.ID,
 		"license_key": license.LicenseKey,
 	})
+}
+
+// DownloadOfflineAuthFile 下载离线授权验证文件
+func (h *AuthHandler) DownloadOfflineAuthFile(c *gin.Context) {
+	licenseKey := c.Param("licenseKey")
+	if licenseKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing license_key"})
+		return
+	}
+
+	// 查询授权码
+	var license models.License
+	if err := h.DB.Where("license_key = ?", licenseKey).First(&license).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "license not found"})
+		return
+	}
+
+	// 查询用户信息
+	var user models.User
+	h.DB.First(&user, license.UserID)
+
+	// 生成离线授权文件（无需离线宽限期）
+	authFile, err := utils.BuildOfflineAuthFile(&license, &user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to build offline auth file: %v", err)})
+		return
+	}
+
+	// 编码为 JSON
+	jsonData, err := utils.EncodeOfflineAuthFile(authFile)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode auth file"})
+		return
+	}
+
+	// 返回 JSON 文件
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=offline-auth-%s.json", licenseKey[:8]))
+	c.Data(http.StatusOK, "application/json", jsonData)
 }
