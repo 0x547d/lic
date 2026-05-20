@@ -1,0 +1,7 @@
+# License SDK Python 3 依赖
+
+# RSA签名验证
+cryptography>=3.4.8
+
+# HTTP请求（用于下载授权文件）
+requests>=2.28.0

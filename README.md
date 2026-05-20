@@ -216,7 +216,7 @@ Header: Authorization: Bearer <token>
 
 ### 客户端示例代码
 
-参见 `cmd/client_example/main.go`：
+**Golang SDK**：参见 `cmd/client_example/main.go` 和 `sdk/go/`
 
 ```bash
 # 1. 下载离线授权文件（需要 JWT Token）
@@ -225,6 +225,28 @@ go run cmd/client_example/main.go download <token> <license_key>
 # 2. 验证离线授权文件（无需联网）
 go run cmd/client_example/main.go verify <license_key>
 ```
+
+**Python SDK**：参见 `sdk/python/`
+
+```bash
+# 安装依赖
+cd sdk/python
+pip install -r requirements.txt
+
+# 验证授权文件
+python3 example.py verify
+
+# 下载授权文件
+python3 example.py download
+```
+
+Python SDK 提供以下 API：
+- `verify_offline_auth_file(file_path, public_key)` - 验证本地授权文件
+- `is_license_valid(file_path, public_key)` - 简单检查授权是否有效
+- `verify_offline_auth_file_from_data(auth_file, public_key)` - 验证内存中的数据
+- `download_offline_auth_file(server_url, token, license_key, save_path)` - 从服务器下载授权文件
+
+详细文档请查看 `sdk/python/README.md`
 
 ### 生产环境部署建议
 
